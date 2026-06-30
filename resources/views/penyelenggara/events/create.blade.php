@@ -1,0 +1,262 @@
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const priceInput = document.querySelector('input[name="price"]');
+  const bankSection = document.getElementById('bankSection');
+  if (!priceInput || !bankSection) return;
+
+  const bankInputs = bankSection.querySelectorAll(
+    'input[name="bank_name"], input[name="bank_account_number"], input[name="bank_account_holder"]'
+  );
+
+  const normalizePrice = (value) => {
+    const digits = String(value ?? '').replace(/[^\d]/g, ''); // 100.000 / 100,000
+    return digits ? parseInt(digits, 10) : 0;
+  };
+
+  const toggleBankSection = () => {
+    const price = normalizePrice(priceInput.value);
+    const show = price > 0;
+    bankSection.classList.toggle('hidden', !show);
+    bankInputs.forEach((input) => input.required = show);
+  };
+
+  priceInput.addEventListener('input', toggleBankSection);
+  toggleBankSection();
+});
+</script>
+
+<x-app-layout>
+    <div class="max-w-4xl mx-auto">
+        <div class="mb-10">
+            <a href="{{ route('penyelenggara.events.index') }}" class="text-slate-400 hover:text-indigo-600 text-sm font-bold mb-4 inline-block transition">
+                <i class="fa-solid fa-arrow-left mr-2"></i> Kembali ke Daftar Event
+            </a>
+            <h1 class="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Buat Event Baru</h1>
+            <p class="text-slate-500 text-sm font-medium">Isi detail lengkap kegiatan Anda.</p>
+        </div>
+
+        {{-- [BLOK VALIDASI ERROR] --}}
+        @if ($errors->any())
+            <div class="mb-8 p-6 bg-red-50 border border-red-200 rounded-2xl">
+                <div class="flex items-center gap-3 text-red-600 font-bold mb-2">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <h3>Gagal Menyimpan Event</h3>
+                </div>
+                <ul class="list-disc list-inside text-sm text-red-500 space-y-1 ml-1">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        <form action="{{ route('penyelenggara.events.store') }}" method="POST" enctype="multipart/form-data" class="bg-white dark:bg-slate-800 p-8 sm:p-10 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-xl shadow-indigo-500/5 space-y-8">
+            @csrf
+
+            {{-- 1. UPLOAD POSTER DENGAN PREVIEW & HOVER EFFECT --}}
+            <div class="mb-6">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Poster Event</label>
+
+                {{-- Container Upload --}}
+                <div class="relative w-full h-64 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-3xl hover:bg-slate-50 dark:hover:bg-white/5 transition flex justify-center items-center overflow-hidden bg-white dark:bg-slate-800 group">
+
+                    {{-- A. Gambar Preview (Default Hidden) --}}
+                    <img id="image-preview" class="absolute inset-0 w-full h-full object-cover hidden z-10">
+
+                    {{-- B. Overlay "Ganti Gambar" (Muncul saat ada gambar & di-hover) --}}
+                    <div id="change-overlay" class="absolute inset-0 bg-black/50 z-20 flex flex-col items-center justify-center opacity-0 transition-opacity duration-300 pointer-events-none hidden group-hover:opacity-100">
+                        <i class="fa-solid fa-pen-to-square text-white text-3xl mb-2"></i>
+                        <p class="text-white text-xs font-bold uppercase tracking-widest">Ganti Poster</p>
+                    </div>
+
+                    {{-- C. Placeholder (Icon Awan) --}}
+                    <div id="image-placeholder" class="text-center p-6 transition-opacity duration-300">
+                        <div class="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
+                        </div>
+                        <p class="text-sm font-bold text-slate-600 dark:text-slate-300">Klik untuk upload poster</p>
+                        <p class="text-xs text-slate-400 mt-1">Format: JPG, PNG (Max 2MB)</p>
+                        {{-- Nama File yang dipilih --}}
+                        <p id="file-name" class="text-xs text-indigo-600 font-bold mt-2 truncate max-w-xs mx-auto"></p>
+                    </div>
+
+                    {{-- D. Input File (Invisible & di paling atas Z-Index) --}}
+                    <input type="file"
+                           name="image"
+                           id="image"
+                           accept="image/*"
+                           required
+                           class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-30"
+                           onchange="previewImage(event)">
+                </div>
+
+                @error('image')
+                    <p class="text-red-500 text-xs mt-1 font-bold">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8">
+                {{-- Nama Event --}}
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Nama Event</label>
+                    <input type="text" name="title" required value="{{ old('title') }}" placeholder="Contoh: Webinar Nasional Teknologi 2026"
+                        class="w-full px-5 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-all font-bold text-slate-800 dark:text-white">
+                </div>
+
+                {{-- Kategori --}}
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Kategori</label>
+                    <select name="category_id" required class="w-full px-5 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-all cursor-pointer">
+                        <option value="" disabled selected>Pilih Kategori</option>
+                        @foreach($categories as $category)
+                            <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>{{ $category->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                {{-- Harga --}}
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Harga Tiket (Rupiah)</label>
+                    <input type="text" name="price"
+                        value="{{ old('price', 0) }}"
+                        inputmode="numeric"
+                        placeholder="Contoh: 100000 atau 100.000"
+                        class="w-full px-5 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-all">
+                    <p class="text-xs text-slate-400 mt-2 font-medium">
+                        Tips: Untuk gratis isi <span class="font-bold">0</span>. Kamu boleh pakai titik ribuan (contoh 100.000).
+                    </p>
+                </div>
+
+                {{-- REKENING PEMBAYARAN --}}
+                <div id="bankSection" class="md:col-span-2 hidden">
+                    <div class="p-6 sm:p-7 rounded-[2rem] bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                            Rekening Pembayaran
+                        </p>
+
+                        <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Nama Bank</label>
+                                <input type="text" name="bank_name"
+                                    value="{{ old('bank_name') }}"
+                                    placeholder="Contoh: BCA / BNI"
+                                    class="w-full px-5 py-4 text-base bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-all">
+                            </div>
+
+                            <div>
+                                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">No. Rekening</label>
+                                <input type="text" name="bank_account_number"
+                                    value="{{ old('bank_account_number') }}"
+                                    placeholder="Contoh: 1234567890"
+                                    class="w-full px-5 py-4 text-base bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-all">
+                            </div>
+
+                            <div>
+                                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Atas Nama</label>
+                                <input type="text" name="bank_account_holder"
+                                    value="{{ old('bank_account_holder') }}"
+                                    placeholder="Contoh: HMSI Tel-U"
+                                    class="w-full px-5 py-4 text-base bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-all">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                {{-- 2. TANGGAL MULAI (datetime-local) --}}
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Waktu Mulai</label>
+                    <input type="datetime-local" id="start_date" name="start_date" required value="{{ old('start_date') }}"
+                        class="w-full px-5 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-all text-slate-500 font-bold">
+                </div>
+
+                {{-- 3. TANGGAL SELESAI (datetime-local) --}}
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Waktu Selesai</label>
+                    <input type="datetime-local" id="end_date" name="end_date" required value="{{ old('end_date') }}"
+                        class="w-full px-5 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-all text-slate-500 font-bold">
+                </div>
+
+                {{-- Lokasi --}}
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Lokasi Pelaksanaan</label>
+                    <input type="text" name="location" required value="{{ old('location') }}" placeholder="Contoh: Gedung Serbaguna Telkom University / Zoom Meeting"
+                        class="w-full px-5 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-all">
+                </div>
+
+                {{-- Deskripsi --}}
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Deskripsi Lengkap</label>
+                    <textarea name="description" rows="6" required placeholder="Jelaskan detail event, persyaratan, dan benefit yang didapat peserta..."
+                        class="w-full px-5 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-all">{{ old('description') }}</textarea>
+                </div>
+            </div>
+
+            {{-- Tombol Aksi --}}
+            <div class="pt-6 border-t border-slate-100 dark:border-white/5 flex items-center justify-end gap-4">
+                <a href="{{ route('penyelenggara.events.index') }}" class="px-6 py-4 rounded-xl text-slate-500 font-bold hover:bg-slate-50 transition uppercase tracking-widest text-xs">Batal</a>
+                <button type="submit" class="px-8 py-4 bg-[#6366f1] hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg shadow-indigo-500/30 transition-all uppercase tracking-widest text-xs">
+                    <i class="fa-solid fa-paper-plane mr-2"></i> Simpan Event
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // Fungsi Preview Image yang AMAN (Tidak hilang saat cancel)
+        function previewImage(event) {
+            const input = event.target;
+            const preview = document.getElementById('image-preview');
+            const placeholder = document.getElementById('image-placeholder');
+            const fileName = document.getElementById('file-name');
+            const overlay = document.getElementById('change-overlay');
+
+            // Cek jika user cancel (file length 0) -> Return, jangan reset gambar
+            if (!input.files || input.files.length === 0) {
+                return;
+            }
+
+            if (input.files[0]) {
+                const reader = new FileReader();
+
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.classList.remove('hidden');
+
+                    // Sembunyikan placeholder icon
+                    placeholder.classList.add('opacity-0');
+
+                    // Aktifkan overlay untuk hover
+                    overlay.classList.remove('hidden');
+                }
+
+                // Tampilkan nama file
+                fileName.textContent = "Terpilih: " + input.files[0].name;
+
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Logic Validasi Tanggal
+        document.addEventListener('DOMContentLoaded', function() {
+            const startDateInput = document.getElementById('start_date');
+            const endDateInput = document.getElementById('end_date');
+
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            const currentDateTime = now.toISOString().slice(0, 16);
+
+            startDateInput.min = currentDateTime;
+
+            startDateInput.addEventListener('change', function() {
+                if (this.value) {
+                    endDateInput.min = this.value;
+                    if (endDateInput.value && endDateInput.value < this.value) {
+                        endDateInput.value = '';
+                        alert('Waktu selesai harus setelah waktu mulai!');
+                    }
+                }
+            });
+        });
+    </script>
+</x-app-layout>
